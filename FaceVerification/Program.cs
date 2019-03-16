@@ -4,6 +4,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using VideoFrameAnalyzer;
 
@@ -16,7 +17,7 @@ namespace BasicConsoleSample
         public static void Main()
         {
             const int detectionInterval = 10000;
-            const int cameraNumber = 1;
+            const int cameraNumber = 0;
             const string subscriptionKey = "";
             const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
             const string referenceImagePath = "./myFace.jpg";
@@ -55,7 +56,10 @@ namespace BasicConsoleSample
                 if (recognizedFaceID != null)
                     result = await faceClient.VerifyAsync(myFaceID, (Guid)recognizedFaceID);
 
-                //Console.WriteLine((result.Confidence > 0.5 ? "Ok" : "Locking...") + " - " + result.Confidence);
+                Console.WriteLine((result.Confidence > 0.5 ? "Ok" : "Locking...") + " - " + result.Confidence);
+
+                if (result.Confidence < 0.5 && lockTimer == 2)
+                    await Task.Run(() => MessageBox.Show("", "Face verifier", MessageBoxButtons.OK, MessageBoxIcon.Warning));
 
                 if (result.Confidence < 0.5 && lockTimer > 2)
                 {
