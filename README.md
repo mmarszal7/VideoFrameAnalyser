@@ -8,11 +8,6 @@ Code in FaceVerification project allows you to automatically lock your computer 
 2. **WPF app** - just Build & Run and paste Azure subscription information in settings tab
 
 ## Running face verification console app as a service:
-Run cmd as admin and paste:
-sc CREATE "Face Verifier" binpath= ".\FaceVerification\bin\Debug\FaceVerifier.exe"
-
-OR
-
 1. Download NSSM
 2. Install your sevice with `nssm.exe install [serviceName]`
 3. Locate your executable from GUI

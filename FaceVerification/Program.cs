@@ -1,34 +1,32 @@
 ﻿using Microsoft.ProjectOxford.Face;
 using Microsoft.ProjectOxford.Face.Contract;
+using OpenCvSharp;
 using System;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using VideoFrameAnalyzer;
 
 namespace BasicConsoleSample
 {
     public static class Program
     {
+        private const int detectionInterval = 10000;
+        private const int cameraNumber = 0;
+        private const string subscriptionKey = "";
+        private const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
+        private const string referenceImagePath = "./myFace.jpg";
+
         private static bool Running = true;
+        private static int lockTimer = 0;
+        private static FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
 
-        public static void Main()
+        private static Guid myFaceID = new Guid();
+        private static Guid? recognizedFaceID = new Guid();
+
+        public static void Main(string[] args)
         {
-            const int detectionInterval = 10000;
-            const int cameraNumber = 0;
-            const string subscriptionKey = "";
-            const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
-            const string referenceImagePath = "./myFace.jpg";
-
-            FrameGrabber<Face[]> grabber = new FrameGrabber<Face[]>();
-            FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
-
-            Guid myFaceID = new Guid();
-            Guid? recognizedFaceID = new Guid();
-            int lockTimer = 0;
-
             using (Stream myFaceImage = new FileStream(referenceImagePath, FileMode.Open))
             {
                 var myFace = faceClient.DetectAsync(myFaceImage, returnFaceId: true).Result;
@@ -36,52 +34,51 @@ namespace BasicConsoleSample
                     myFaceID = myFace[0].FaceId;
             }
 
-            grabber.AnalysisFunction = async frame =>
-            {
-                if (!Running) return null;
-
-                var recognizedFace = await faceClient.DetectAsync(frame.Image.ToMemoryStream(".jpg"), returnFaceId: true);
-                recognizedFaceID = recognizedFace.Length > 0 ? recognizedFace[0].FaceId : (Guid?)null;
-
-                return recognizedFace;
-            };
-
-            grabber.NewResultAvailable += async (s, e) =>
-            {
-                if (!Running) return;
-
-                VerifyResult result = new VerifyResult() { Confidence = 0 };
-
-                if (recognizedFaceID != null)
-                    result = await faceClient.VerifyAsync(myFaceID, (Guid)recognizedFaceID);
-
-                Console.WriteLine((result.Confidence > 0.5 ? "Ok" : "Locking...") + " - " + result.Confidence);
-
-                if (result.Confidence < 0.5)
-                {
-                    lockTimer++;
-
-                    if (lockTimer == 1)
-                        await Task.Run(() => MessageBox.Show("...", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning));
-
-                    if (lockTimer > 1)
-                    {
-                        LockWorkStation();
-                        lockTimer = 0;
-                    }
-                }
-
-            };
-
-            grabber.TriggerAnalysisOnInterval(TimeSpan.FromMilliseconds(detectionInterval));
-
-            grabber.StartProcessingCameraAsync(cameraNumber).Wait();
+            var timer = new System.Timers.Timer() { Interval = detectionInterval };
+            timer.Elapsed += new System.Timers.ElapsedEventHandler(VerifyFace);
+            timer.Start();
 
             SetupTrayIcon();
+        }
 
-            Console.ReadKey();
+        private static async void VerifyFace(object s, EventArgs e)
+        {
+            if (!Running) return;
 
-            grabber.StopProcessingAsync().Wait();
+            var frame = GetCameraImage();
+
+            var recognizedFace = await faceClient.DetectAsync(frame.ToMemoryStream(".jpg"), returnFaceId: true);
+            recognizedFaceID = recognizedFace.Length > 0 ? recognizedFace[0].FaceId : (Guid?)null;
+
+            VerifyResult result = new VerifyResult() { Confidence = 0 };
+
+            if (recognizedFaceID != null)
+                result = await faceClient.VerifyAsync(myFaceID, (Guid)recognizedFaceID);
+
+            Console.WriteLine((result.Confidence > 0.5 ? "Ok" : "Locking...") + " - " + result.Confidence);
+
+            if (result.Confidence < 0.5)
+            {
+                lockTimer++;
+
+                if (lockTimer == 1)
+                    await Task.Run(() => MessageBox.Show(new Form() { TopMost = true }, "...", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+
+                if (lockTimer > 1)
+                    LockWorkStation();
+            }
+            else
+            {
+                lockTimer = 0;
+            }
+        }
+
+        private static Mat GetCameraImage()
+        {
+            VideoCapture _reader = new VideoCapture(cameraNumber);
+            Mat image = new Mat();
+            bool success = _reader.Read(image);
+            return image;
         }
 
         [DllImport("user32.dll")]

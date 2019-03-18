@@ -127,12 +127,6 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\VideoFrameAnalyzer\VideoFrameAnalyzer.csproj">
-      <Project>{bec7da78-c953-4a72-924f-2749d1f9f18b}</Project>
-      <Name>VideoFrameAnalyzer</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <ItemGroup>
