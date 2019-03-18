@@ -50,7 +50,6 @@ namespace BasicConsoleSample
             {
                 if (!Running) return;
 
-                lockTimer++;
                 VerifyResult result = new VerifyResult() { Confidence = 0 };
 
                 if (recognizedFaceID != null)
@@ -58,14 +57,20 @@ namespace BasicConsoleSample
 
                 Console.WriteLine((result.Confidence > 0.5 ? "Ok" : "Locking...") + " - " + result.Confidence);
 
-                if (result.Confidence < 0.5 && lockTimer == 2)
-                    await Task.Run(() => MessageBox.Show("", "Face verifier", MessageBoxButtons.OK, MessageBoxIcon.Warning));
-
-                if (result.Confidence < 0.5 && lockTimer > 2)
+                if (result.Confidence < 0.5)
                 {
-                    LockWorkStation();
-                    lockTimer = 0;
+                    lockTimer++;
+
+                    if (lockTimer == 1)
+                        await Task.Run(() => MessageBox.Show("...", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+
+                    if (lockTimer > 1)
+                    {
+                        LockWorkStation();
+                        lockTimer = 0;
+                    }
                 }
+
             };
 
             grabber.TriggerAnalysisOnInterval(TimeSpan.FromMilliseconds(detectionInterval));
