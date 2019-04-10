@@ -1,5 +1,6 @@
 ﻿using Microsoft.ProjectOxford.Face;
 using Microsoft.ProjectOxford.Face.Contract;
+using Microsoft.Win32;
 using OpenCvSharp;
 using System;
 using System.Drawing;
@@ -18,8 +19,9 @@ namespace BasicConsoleSample
         private const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
         private const string referenceImagePath = "./myFace.jpg";
 
-        private static bool Running = true;
+        private static bool Paused = false;
         private static int lockTimer = 0;
+        private static int maxFailures = 2;
         private static FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
 
         private static Guid myFaceID = new Guid();
@@ -38,12 +40,13 @@ namespace BasicConsoleSample
             timer.Elapsed += new System.Timers.ElapsedEventHandler(VerifyFace);
             timer.Start();
 
+            SystemEvents.SessionSwitch += SessionSwitched;
             SetupTrayIcon();
         }
 
         private static async void VerifyFace(object s, EventArgs e)
         {
-            if (!Running) return;
+            if (Paused) return;
 
             var frame = GetCameraImage();
 
@@ -64,8 +67,11 @@ namespace BasicConsoleSample
                 if (lockTimer == 1)
                     await Task.Run(() => MessageBox.Show(new Form() { TopMost = true }, "...", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning));
 
-                if (lockTimer > 1)
+                if (lockTimer > maxFailures)
+                {
                     LockWorkStation();
+                    lockTimer = 0;
+                }
             }
             else
             {
@@ -77,12 +83,15 @@ namespace BasicConsoleSample
         {
             VideoCapture _reader = new VideoCapture(cameraNumber);
             Mat image = new Mat();
-            bool success = _reader.Read(image);
+            _reader.Read(image);
             return image;
         }
 
         [DllImport("user32.dll")]
         private static extern bool LockWorkStation();
+
+        private static void SessionSwitched(object s, SessionSwitchEventArgs e) =>
+           Paused = e.Reason == SessionSwitchReason.SessionLock ? true : false;
 
         private static void SetupTrayIcon()
         {
@@ -94,7 +103,7 @@ namespace BasicConsoleSample
             trayMenu.MenuItems.Add("Running", (s, e) =>
             {
                 trayIcon.ContextMenu.MenuItems[0].Checked = !trayIcon.ContextMenu.MenuItems[0].Checked;
-                Running = !Running;
+                Paused = !Paused;
             });
             trayMenu.MenuItems[0].Checked = true;
 
