@@ -70,6 +70,7 @@ namespace BasicConsoleSample
                 if (lockTimer > maxFailures)
                 {
                     LockWorkStation();
+                    Paused = true;
                     lockTimer = 0;
                 }
             }
