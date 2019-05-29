@@ -19,7 +19,9 @@ namespace BasicConsoleSample
         private const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
         private const string referenceImagePath = "./myFace.jpg";
 
+        private static ContextMenu TrayMenu = new ContextMenu();
         private static bool Paused = false;
+        private static int iteration = 0;
         private static int lockTimer = 0;
         private static int maxFailures = 2;
         private static FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
@@ -58,8 +60,6 @@ namespace BasicConsoleSample
             if (recognizedFaceID != null)
                 result = await faceClient.VerifyAsync(myFaceID, (Guid)recognizedFaceID);
 
-            Console.WriteLine((result.Confidence > 0.5 ? "Ok" : "Locking...") + " - " + result.Confidence);
-
             if (result.Confidence < 0.5)
             {
                 lockTimer++;
@@ -78,6 +78,9 @@ namespace BasicConsoleSample
             {
                 lockTimer = 0;
             }
+
+            TrayMenu.MenuItems[1].Text = $"Result ({iteration}): {result.Confidence}";
+            iteration++;
         }
 
         private static Mat GetCameraImage()
@@ -91,8 +94,12 @@ namespace BasicConsoleSample
         [DllImport("user32.dll")]
         private static extern bool LockWorkStation();
 
-        private static void SessionSwitched(object s, SessionSwitchEventArgs e) =>
-           Paused = e.Reason == SessionSwitchReason.SessionLock ? true : false;
+        private static void SessionSwitched(object s, SessionSwitchEventArgs e)
+        {
+            Paused = e.Reason == SessionSwitchReason.SessionLock ?
+                true :
+                TrayMenu.MenuItems[0].Checked ? true : false;
+        }
 
         private static void SetupTrayIcon()
         {
@@ -100,15 +107,15 @@ namespace BasicConsoleSample
             trayIcon.Text = "Face Detector";
             trayIcon.Icon = new Icon(SystemIcons.Question, 40, 40);
 
-            ContextMenu trayMenu = new ContextMenu();
-            trayMenu.MenuItems.Add("Running", (s, e) =>
+            TrayMenu.MenuItems.Add("Pause", (s, e) =>
             {
                 trayIcon.ContextMenu.MenuItems[0].Checked = !trayIcon.ContextMenu.MenuItems[0].Checked;
                 Paused = !Paused;
             });
-            trayMenu.MenuItems[0].Checked = true;
+            TrayMenu.MenuItems[0].Checked = false;
+            TrayMenu.MenuItems.Add(new MenuItem("Result: "));
 
-            trayIcon.ContextMenu = trayMenu;
+            trayIcon.ContextMenu = TrayMenu;
             trayIcon.Visible = true;
             Application.Run();
         }
