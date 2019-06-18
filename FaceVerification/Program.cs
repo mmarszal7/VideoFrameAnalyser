@@ -1,66 +1,38 @@
-﻿using Microsoft.ProjectOxford.Face;
-using Microsoft.ProjectOxford.Face.Contract;
-using Microsoft.Win32;
-using OpenCvSharp;
-using System;
+﻿using System;
 using System.Drawing;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace BasicConsoleSample
+namespace FaceVerifier
 {
     public static class Program
     {
         private const int detectionInterval = 10000;
-        private const int cameraNumber = 0;
-        private const string subscriptionKey = "";
-        private const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
-        private const string referenceImagePath = "./myFace.jpg";
+        private const int maxFailures = 2;
 
-        private static ContextMenu TrayMenu = new ContextMenu();
-        private static bool Paused = false;
-        private static int iteration = 0;
         private static int lockTimer = 0;
-        private static int maxFailures = 2;
-        private static FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
+        private static bool paused = false;
 
-        private static Guid myFaceID = new Guid();
-        private static Guid? recognizedFaceID = new Guid();
+        private static readonly SessionManager SessionManager = new SessionManager();
+        private static readonly FaceVerifier FaceVerifier = new FaceVerifier();
+        private static readonly NotifyIcon TrayIcon = new NotifyIcon();
 
         public static void Main(string[] args)
         {
-            using (Stream myFaceImage = new FileStream(referenceImagePath, FileMode.Open))
-            {
-                var myFace = faceClient.DetectAsync(myFaceImage, returnFaceId: true).Result;
-                if (myFace.Length > 0)
-                    myFaceID = myFace[0].FaceId;
-            }
-
             var timer = new System.Timers.Timer() { Interval = detectionInterval };
             timer.Elapsed += new System.Timers.ElapsedEventHandler(VerifyFace);
             timer.Start();
 
-            SystemEvents.SessionSwitch += SessionSwitched;
             SetupTrayIcon();
+            Application.Run();
         }
 
         private static async void VerifyFace(object s, EventArgs e)
         {
-            if (Paused) return;
+            if (paused || SessionManager.ScreenLocked) return;
 
-            var frame = GetCameraImage();
-
-            var recognizedFace = await faceClient.DetectAsync(frame.ToMemoryStream(".jpg"), returnFaceId: true);
-            recognizedFaceID = recognizedFace.Length > 0 ? recognizedFace[0].FaceId : (Guid?)null;
-
-            VerifyResult result = new VerifyResult() { Confidence = 0 };
-
-            if (recognizedFaceID != null)
-                result = await faceClient.VerifyAsync(myFaceID, (Guid)recognizedFaceID);
-
-            if (result.Confidence < 0.5)
+            var confidence = await FaceVerifier.VerifyFace();
+            if (confidence < 0.5)
             {
                 lockTimer++;
 
@@ -69,8 +41,8 @@ namespace BasicConsoleSample
 
                 if (lockTimer > maxFailures)
                 {
-                    LockWorkStation();
-                    Paused = true;
+                    SessionManager.LockWorkStation();
+                    SessionManager.ScreenLocked = true;
                     lockTimer = 0;
                 }
             }
@@ -79,45 +51,21 @@ namespace BasicConsoleSample
                 lockTimer = 0;
             }
 
-            TrayMenu.MenuItems[1].Text = $"Result ({iteration}): {result.Confidence}";
-            iteration++;
-        }
-
-        private static Mat GetCameraImage()
-        {
-            VideoCapture _reader = new VideoCapture(cameraNumber);
-            Mat image = new Mat();
-            _reader.Read(image);
-            return image;
-        }
-
-        [DllImport("user32.dll")]
-        private static extern bool LockWorkStation();
-
-        private static void SessionSwitched(object s, SessionSwitchEventArgs e)
-        {
-            Paused = e.Reason == SessionSwitchReason.SessionLock ?
-                true :
-                TrayMenu.MenuItems[0].Checked ? true : false;
+            TrayIcon.Text = confidence.ToString();
         }
 
         private static void SetupTrayIcon()
         {
-            NotifyIcon trayIcon = new NotifyIcon();
-            trayIcon.Text = "Face Detector";
-            trayIcon.Icon = new Icon(SystemIcons.Question, 40, 40);
-
+            ContextMenu TrayMenu = new ContextMenu();
             TrayMenu.MenuItems.Add("Pause", (s, e) =>
             {
-                trayIcon.ContextMenu.MenuItems[0].Checked = !trayIcon.ContextMenu.MenuItems[0].Checked;
-                Paused = !Paused;
+                paused = !paused;
+                (s as MenuItem).Checked = paused;
             });
-            TrayMenu.MenuItems[0].Checked = false;
-            TrayMenu.MenuItems.Add(new MenuItem("Result: "));
 
-            trayIcon.ContextMenu = TrayMenu;
-            trayIcon.Visible = true;
-            Application.Run();
+            TrayIcon.ContextMenu = TrayMenu;
+            TrayIcon.Icon = new Icon(SystemIcons.Question, 40, 40);
+            TrayIcon.Visible = true;
         }
     }
 }
