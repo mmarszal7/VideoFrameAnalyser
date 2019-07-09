@@ -14,15 +14,15 @@ namespace FaceVerifier
         private const string apiRoot = "https://westeurope.api.cognitive.microsoft.com/face/v1.0";
         private const string referenceImagePath = "./myFace.jpg";
 
-        private static FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
-        private static Guid myFaceID = new Guid();
+        private static readonly FaceServiceClient faceClient = new FaceServiceClient(subscriptionKey, apiRoot);
+        private static Guid myFaceID;
         private static Guid? recognizedFaceID = new Guid();
 
         public FaceVerifier()
         {
             using (Stream myFaceImage = new FileStream(referenceImagePath, FileMode.Open))
             {
-                var myFace = faceClient.DetectAsync(myFaceImage, returnFaceId: true).Result;
+                var myFace = faceClient.DetectAsync(myFaceImage).Result;
                 if (myFace.Length > 0)
                     myFaceID = myFace[0].FaceId;
             }
@@ -32,10 +32,10 @@ namespace FaceVerifier
         {
             var frame = GetCameraImage();
 
-            var recognizedFace = await faceClient.DetectAsync(frame.ToMemoryStream(".jpg"), returnFaceId: true);
+            var recognizedFace = await faceClient.DetectAsync(frame.ToMemoryStream(".jpg"));
             recognizedFaceID = recognizedFace.Length > 0 ? recognizedFace[0].FaceId : (Guid?)null;
 
-            VerifyResult result = new VerifyResult() { Confidence = 0 };
+            var result = new VerifyResult() { Confidence = 0 };
 
             if (recognizedFaceID != null)
                 result = await faceClient.VerifyAsync(myFaceID, (Guid)recognizedFaceID);
@@ -45,8 +45,8 @@ namespace FaceVerifier
 
         private static Mat GetCameraImage()
         {
-            VideoCapture _reader = new VideoCapture(cameraNumber);
-            Mat image = new Mat();
+            var _reader = new VideoCapture(cameraNumber);
+            var image = new Mat();
             _reader.Read(image);
             return image;
         }
