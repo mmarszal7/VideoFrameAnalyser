@@ -45,9 +45,13 @@ namespace FaceVerifier
 
         private static Mat GetCameraImage()
         {
-            var _reader = new VideoCapture(cameraNumber);
             var image = new Mat();
-            _reader.Read(image);
+
+            using (var _reader = new VideoCapture(cameraNumber))
+            {
+                _reader.Read(image);
+            }
+
             return image;
         }
     }

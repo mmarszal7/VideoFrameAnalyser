@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -12,6 +14,7 @@ namespace FaceVerifier
 
         private static int lockTimer = 0;
         private static bool paused = false;
+        private static bool warningShown = false;
 
         private static readonly SessionManager SessionManager = new SessionManager();
         private static readonly FaceVerifier FaceVerifier = new FaceVerifier();
@@ -29,20 +32,17 @@ namespace FaceVerifier
 
         private static async void VerifyFace(object s, EventArgs e)
         {
-            if (paused || SessionManager.ScreenLocked) return;
+            if (paused || IsScreenLocked()) return;
 
             var confidence = await FaceVerifier.VerifyFace();
             if (confidence < 0.5)
             {
                 lockTimer++;
-
-                if (lockTimer == 1)
-                    await Task.Run(() => MessageBox.Show(new Form() { TopMost = true }, "...", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                await ShowWarning();
 
                 if (lockTimer > maxFailures)
                 {
                     SessionManager.LockWorkStation();
-                    SessionManager.ScreenLocked = true;
                     lockTimer = 0;
                 }
             }
@@ -54,13 +54,29 @@ namespace FaceVerifier
             TrayIcon.Text = confidence.ToString();
         }
 
+        private static bool IsScreenLocked() => Process.GetProcessesByName("lockapp").First().Threads[0].WaitReason != ThreadWaitReason.Suspended;
+
+        private static async Task ShowWarning()
+        {
+            await Task.Run(() =>
+            {
+                if (warningShown) return;
+
+                warningShown = true;
+                if (MessageBox.Show(new Form() { TopMost = true }, "...", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning) == DialogResult.OK)
+                {
+                    warningShown = false;
+                }
+            });
+        }
+
         private static void SetupTrayIcon()
         {
             ContextMenu TrayMenu = new ContextMenu();
             TrayMenu.MenuItems.Add("Pause", (s, e) =>
             {
                 paused = !paused;
-                (s as MenuItem).Checked = paused;
+                ((MenuItem) s).Checked = paused;
             });
 
             TrayIcon.ContextMenu = TrayMenu;

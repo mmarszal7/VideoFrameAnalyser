@@ -70,10 +70,10 @@ namespace LiveCameraSample
         public enum AppMode
         {
             Faces,
-            Emotions,
+            //Emotions,
             EmotionsWithClientFaceDetect,
-            Tags,
-            Celebrities
+            //Tags,
+            //Celebrities
         }
 
         public MainWindow()
@@ -332,10 +332,8 @@ namespace LiveCameraSample
             switch (_mode)
             {
                 case AppMode.Faces:
+                    _fuseClientRemoteResults = true;
                     _grabber.AnalysisFunction = FacesAnalysisFunction;
-                    break;
-                case AppMode.Emotions:
-                    _grabber.AnalysisFunction = EmotionAnalysisFunction;
                     break;
                 case AppMode.EmotionsWithClientFaceDetect:
                     // Same as Emotions, except we will display the most recent faces combined with
@@ -343,12 +341,12 @@ namespace LiveCameraSample
                     _grabber.AnalysisFunction = EmotionAnalysisFunction;
                     _fuseClientRemoteResults = true;
                     break;
-                case AppMode.Tags:
-                    _grabber.AnalysisFunction = TaggingAnalysisFunction;
-                    break;
-                case AppMode.Celebrities:
-                    _grabber.AnalysisFunction = CelebrityAnalysisFunction;
-                    break;
+                //case AppMode.Tags:
+                //    _grabber.AnalysisFunction = TaggingAnalysisFunction;
+                //    break;
+                //case AppMode.Celebrities:
+                //    _grabber.AnalysisFunction = CelebrityAnalysisFunction;
+                //    break;
                 default:
                     _grabber.AnalysisFunction = null;
                     break;
