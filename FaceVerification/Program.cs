@@ -54,7 +54,17 @@ namespace FaceVerifier
             TrayIcon.Text = confidence.ToString();
         }
 
-        private static bool IsScreenLocked() => Process.GetProcessesByName("lockapp").First().Threads[0].WaitReason != ThreadWaitReason.Suspended;
+        private static bool IsScreenLocked()
+        {
+            var lockProcess = Process.GetProcessesByName("lockapp");
+
+            if (lockProcess.Length == 0)
+            {
+                SessionManager.LockWorkStation();
+            }
+
+            return lockProcess.First().Threads[0].WaitReason != ThreadWaitReason.Suspended;
+        }
 
         private static async Task ShowWarning()
         {
