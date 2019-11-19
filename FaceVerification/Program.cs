@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -32,26 +33,36 @@ namespace FaceVerifier
 
         private static async void VerifyFace(object s, EventArgs e)
         {
-            if (paused || IsScreenLocked()) return;
-
-            var confidence = await FaceVerifier.VerifyFace();
-            if (confidence < 0.5)
+            try
             {
-                lockTimer++;
-                await ShowWarning();
+                if (paused || IsScreenLocked()) return;
 
-                if (lockTimer > maxFailures)
+                var confidence = await FaceVerifier.VerifyFace();
+                if (confidence < 0.5)
                 {
-                    SessionManager.LockWorkStation();
+                    lockTimer++;
+                    await ShowWarning();
+
+                    if (lockTimer > maxFailures)
+                    {
+                        SessionManager.LockWorkStation();
+                        lockTimer = 0;
+                    }
+                }
+                else
+                {
                     lockTimer = 0;
                 }
-            }
-            else
-            {
-                lockTimer = 0;
-            }
 
-            TrayIcon.Text = confidence.ToString();
+                TrayIcon.Text = confidence.ToString();
+            }
+            catch (Exception exception)
+            {
+                using (StreamWriter w = File.AppendText("log.txt"))
+                {
+                    w.WriteLine($"{DateTime.Now} {exception.Message}");
+                }
+            }
         }
 
         private static bool IsScreenLocked()
@@ -86,7 +97,7 @@ namespace FaceVerifier
             TrayMenu.MenuItems.Add("Pause", (s, e) =>
             {
                 paused = !paused;
-                ((MenuItem) s).Checked = paused;
+                ((MenuItem)s).Checked = paused;
             });
 
             TrayIcon.ContextMenu = TrayMenu;
